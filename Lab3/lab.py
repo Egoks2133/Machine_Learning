@@ -34,27 +34,23 @@ def extract_float_value(value):
     return np.nan
 
 
-def load_and_prepare_data():
-    # fetch dataset
+def data_preparation():
     istanbul_stock_exchange = fetch_ucirepo(id=247)
 
-    # data (as pandas dataframes)
-    X_df = istanbul_stock_exchange.data.features.copy()
+    x_df = istanbul_stock_exchange.data.features.copy()
 
-    # Для этого датасета targets может быть None, поэтому берем последний столбец как целевую переменную
-    # Согласно описанию датасета, последний столбец - это Istanbul Stock Exchange National 100 Index
     if istanbul_stock_exchange.data.targets is not None:
         y_df = istanbul_stock_exchange.data.targets.copy()
     else:
         # Если targets нет, используем последний столбец features как целевую переменную
-        y_df = X_df.iloc[:, -1].copy()
-        X_df = X_df.iloc[:, :-1]  # Убираем последний столбец из признаков
+        y_df = x_df.iloc[:, -1].copy()
+        x_df = x_df.iloc[:, :-1]  # Убираем последний столбец из признаков
 
     # Применяем функцию преобразования к признакам
-    X_df = X_df.map(extract_float_value)
+    x_df = x_df.map(extract_float_value)
     # Заполнение NaN: для каждого столбца заполняем медианой, если столбец не полностью NaN, иначе 0.
-    X_df = X_df.apply(lambda col: col.fillna(col.median() if not col.isnull().all() else 0))
-    X_df = X_df.astype(float)
+    x_df = x_df.apply(lambda col: col.fillna(col.median() if not col.isnull().all() else 0))
+    x_df = x_df.astype(float)
 
     # Обработка целевой переменной
     if isinstance(y_df, pd.DataFrame) and y_df.shape[1] == 1:
@@ -62,7 +58,6 @@ def load_and_prepare_data():
     elif isinstance(y_df, pd.DataFrame) and y_df.shape[1] > 1:
         # Используем первый столбец как целевую переменную
         y_df = y_df.iloc[:, 0]
-        print(f"Используется первый столбец целевой переменной: {y_df.name}")
     elif not isinstance(y_df, pd.Series):
         # Если это не Series и не DataFrame, преобразуем
         y_df = pd.Series(y_df)
@@ -71,19 +66,17 @@ def load_and_prepare_data():
     y_df = y_df.fillna(y_df.median() if not y_df.isnull().all() else 0)
     y_df = y_df.astype(float)
 
-    return X_df, y_df
+    return x_df, y_df
 
 
-X, y = load_and_prepare_data()
+x, y = data_preparation()
 
-print(f"Размерность признаков: {X.shape}")
-print(f"Размерность целевой переменной: {y.shape}")
-print(f"Имя целевой переменной: {y.name if hasattr(y, 'name') else 'N/A'}")
-
+# =========
 # 1) Разделение на тестовую и обучающие выборки
+# =========
 
 # Общее количество образцов
-n_samples = X.shape[0]
+n_samples = x.shape[0]
 
 # Массив индексов от 0 до n_samples-1
 indices = np.arange(n_samples)
@@ -91,28 +84,39 @@ indices = np.arange(n_samples)
 # Перемешиваем индексы случайным образом
 np.random.shuffle(indices)
 
-# Применяем перемешанные индексы к X и y (DataFrame/Series)
-X_shuffled = X.iloc[indices]
+# Применяем перемешанные индексы к x и y (DataFrame/Series)
+x_shuffled = x.iloc[indices]
 y_shuffled = y.iloc[indices]
 
-# Разделяем перемешанные данные
+# Разделяем перемешанные данные из расчета 80% train, 20% test
 train_size = int(n_samples * 0.8)
 
-X_train = X_shuffled[:train_size]
-X_test = X_shuffled[train_size:]
+x_train = x_shuffled[:train_size]
+x_test = x_shuffled[train_size:]
 
 y_train = y_shuffled[:train_size]
 y_test = y_shuffled[train_size:]
 
-print(f"Размер обучающей выборки: {X_train.shape}")
-print(f"Размер тестовой выборки: {X_test.shape}")
+print(f"Размер обучающей выборки: {x_train.shape}")
+print(f"Размер тестовой выборки: {x_test.shape}")
 
-# 2) Обучение модели по линейной регрессии
+# =========
+# 2) Обучение модели линейной регрессии
+# =========
 
-regressor = LinearRegression().fit(X_train, y_train)
+# Создаем объект класса LinearRegression и запускаем алгоритм градиентного спуска
+regressor = LinearRegression().fit(x_train, y_train)
 
-y_train_pred = regressor.predict(X_train)
-y_test_pred = regressor.predict(X_test)
+# Предсказания
+y_train_pred = regressor.predict(x_train)
+y_test_pred = regressor.predict(x_test)
+
+# =========
+# 3) Проверка модели на тестовой выборке
+# =========
+# В качестве метрики проверки будем использовать коэфициент детерминации -
+# статистический показатель, который показывает долю изменчивости зависимой переменной
+
 
 print(f"Коэффициэнт детерминации TRAIN: {r2_score(y_train, y_train_pred):.2f}")
 print(f"Коэффициэнт детерминации TEST: {r2_score(y_test, y_test_pred):.2f}")
@@ -132,11 +136,15 @@ plt.legend()
 plt.grid(True, linestyle='--', alpha=0.7)
 plt.show()
 
-# Полиномиальная регрессия
-degrees = range(1, 4)  # Увеличил диапазон степеней
+# =========
+# 4) Построение модели с использованием полиномиальной регрессии
+# =========
+
+degrees = range(1, 4)
 r2_train_list = []
 r2_test_list = []
 
+#Поочередное обучение модели с разной степенью полинома
 for degree in degrees:
     print(f"Обучение полиномиальной регрессии степени {degree}")
     pipeline = Pipeline([
@@ -144,10 +152,10 @@ for degree in degrees:
         ("linear_regression", LinearRegression())
     ])
 
-    pipeline.fit(X_train, y_train)
+    pipeline.fit(x_train, y_train)
 
-    y_train_pred = pipeline.predict(X_train)
-    y_test_pred = pipeline.predict(X_test)
+    y_train_pred = pipeline.predict(x_train)
+    y_test_pred = pipeline.predict(x_test)
 
     r2_train = r2_score(y_train, y_train_pred)
     r2_test = r2_score(y_test, y_test_pred)
@@ -173,10 +181,13 @@ if len(r2_test_list) > 0:
     best_degree = degrees[best_degree_index]
     print(f"Наилучшая степень полинома: {best_degree}")
 else:
-    best_degree = 2
+    best_degree = 1
     print(f"Используется степень по умолчанию: {best_degree}")
 
-# Ridge регрессия с полиномиальными признаками
+# =========
+# 5) Построение модели с использованием регуляризации
+# =========
+
 degree = best_degree  # Используем лучшую степень
 alphas = np.logspace(-4, 3, 10)  # диапазон коэффициентов регуляризации
 
@@ -191,11 +202,11 @@ for alpha in alphas:
     ])
 
     # Обучаем модель на train
-    pipeline.fit(X_train, y_train)
+    pipeline.fit(x_train, y_train)
 
     # Предсказания
-    y_train_pred = pipeline.predict(X_train)
-    y_test_pred = pipeline.predict(X_test)
+    y_train_pred = pipeline.predict(x_train)
+    y_test_pred = pipeline.predict(x_test)
 
     # R^2
     r2_train_list.append(r2_score(y_train, y_train_pred))
@@ -221,7 +232,7 @@ else:
 
 # Сравнение всех моделей
 print("\n===== СРАВНЕНИЕ МОДЕЛЕЙ =====")
-linear_r2_test = r2_score(y_test, LinearRegression().fit(X_train, y_train).predict(X_test))
+linear_r2_test = r2_score(y_test, LinearRegression().fit(x_train, y_train).predict(x_test))
 print(f"Линейная регрессия - R2 test: {linear_r2_test:.4f}")
 
 if len(r2_test_list) > 0 and best_degree_index < len(r2_test_list):
