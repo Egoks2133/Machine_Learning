@@ -75,7 +75,7 @@ x, y = data_preparation()
 # 1) Разделение на тестовую и обучающую выборки
 # =========
 
-# Общее количество образцов
+# Общее количество данных
 n_samples = x.shape[0]
 
 # Массив индексов от 0 до n_samples-1
@@ -114,12 +114,10 @@ y_test_pred = regressor.predict(x_test)
 # =========
 # 3) Проверка модели на тестовой выборке
 # =========
-# В качестве метрики проверки будем использовать коэфициент детерминации -
-# статистический показатель, который показывает долю изменчивости зависимой переменной
 
-
-print(f"Коэффициэнт детерминации TRAIN: {r2_score(y_train, y_train_pred):.2f}")
-print(f"Коэффициэнт детерминации TEST: {r2_score(y_test, y_test_pred):.2f}")
+print(f"Коэффициент детерминации:")
+print(f"R2 TRAIN: {r2_score(y_train, y_train_pred):.2f}")
+print(f"R2 TEST: {r2_score(y_test, y_test_pred):.2f} \n\n\n")
 
 plt.figure(figsize=(8, 6))
 plt.scatter(y_test, y_test_pred, color="black", alpha=0.6, label="Фактические vs. Прогноз")
@@ -241,5 +239,4 @@ if len(r2_test_list) > 0 and best_degree_index < len(r2_test_list):
 
 if len(r2_test_list) > 0:
     ridge_r2_test = r2_test_list[best_index]
-
     print(f"Ridge регрессия (alpha={best_alpha:.4f}) - R2 test: {ridge_r2_test:.4f}")
