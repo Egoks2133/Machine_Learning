@@ -72,7 +72,7 @@ def data_preparation():
 x, y = data_preparation()
 
 # =========
-# 1) Разделение на тестовую и обучающие выборки
+# 1) Разделение на тестовую и обучающую выборки
 # =========
 
 # Общее количество образцов
@@ -241,4 +241,5 @@ if len(r2_test_list) > 0 and best_degree_index < len(r2_test_list):
 
 if len(r2_test_list) > 0:
     ridge_r2_test = r2_test_list[best_index]
+
     print(f"Ridge регрессия (alpha={best_alpha:.4f}) - R2 test: {ridge_r2_test:.4f}")
