@@ -16,7 +16,6 @@
 # =========
 # 1) Разделение на тестовую и обучающую выборки
 # =========
-
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
 )
@@ -72,120 +71,71 @@ print("\n" + "="*100 + "\n")
 </p>
 
 
-## 4) Построение модели с использованием полиномиальной регрессии
-Полиномиальная регрессия — это метод машинного обучения, используемый для моделирования нелинейных зависимостей между переменными путем аппроксимации данных полиномом степени (k). В отличие от линейной регрессии, которая предполагает прямую связь, этот метод позволяет учитывать более сложные криволинейные тренды в данных.
-
-Создаём pipeline - объект, который автоматизирует процесс трансформации признаков в полиномиальные. Он будет применять шаги poly_features и linear_regression по порядку. Иначе нам пришлось бы вручную использовать методы.
-
+## 4) Проверка точности моделей
+Для расчета точности используем метрику accuracy_score из библиотеки scikit-learn.
 ```
 # =========
-# 4) Построение модели с использованием полиномиальной регрессии
+# 4) Проверка точности моделей
 # =========
-
-degrees = range(1, 4)
-r2_train_list = []
-r2_test_list = []
-
-#Поочередное обучение модели с разной степенью полинома
-for degree in degrees:
-    print(f"Обучение полиномиальной регрессии степени {degree}")
-    pipeline = Pipeline([
-        ("poly_features", PolynomialFeatures(degree=degree, include_bias=False)),
-        ("linear_regression", LinearRegression())
-    ])
-
-    pipeline.fit(x_train, y_train)
-
-    y_train_pred = pipeline.predict(x_train)
-    y_test_pred = pipeline.predict(x_test)
-
-    r2_train = r2_score(y_train, y_train_pred)
-    r2_test = r2_score(y_test, y_test_pred)
-
-    r2_train_list.append(r2_train)
-    r2_test_list.append(r2_test)
-
-    print(f"  R2 train: {r2_train:.4f}, R2 test: {r2_test:.4f}")
-
-    plt.figure(figsize=(8, 5))
-    plt.plot(degrees, r2_train_list, marker='o', label="Train R2")
-    plt.plot(degrees, r2_test_list, marker='o', label="Test R2")
-    plt.xlabel("Degree of Polynomial Features")
-    plt.ylabel("R^2")
-    plt.title("Полиномиальная регрессия")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+print(f"Точность Perceptron: {accuracy_perceptron:.4f}")
+print(f"Точность MLPClassifier: {accuracy_mlp:.4f}")
 ```
 
 По графику можно сказать, что самой подходящей степенью полинома будет 1:
 <p align="center">
+  <img src="Screen_1.png" />
+</p>
+
+
+## 5) Подбор гиперпараметров
+Гиперпараметры нейронной сети — это настраиваемые параметры, которые задаются до начала обучения и управляют самим процессом обучения и структурой модели. В работе мы изменяем:
+Архитектуру сети — количество и размер скрытых слоев
+Тип функции активации
+Алгоритм оптимизации весов модели
+Коэффициент регуляризации
+Начальную скорость обучения
+
+```
+# =========
+# 5) Подбор гиперпараметров
+# =========
+print("Запуск GridSearchCV для подбора гиперпараметров...")
+param_grid = {
+    'hidden_layer_sizes': [(50,), (100,), (50, 50), (100, 50)],
+    'activation': ['relu', 'tanh', 'logistic'],
+    'solver': ['adam', 'sgd'],
+    'alpha': [0.0001, 0.001, 0.01],
+    'learning_rate_init': [0.001, 0.01]
+}
+
+grid_search = GridSearchCV(MLPClassifier(max_iter=1000, random_state=42, early_stopping=True),
+                           param_grid,
+                           scoring='accuracy',
+                           cv=5,
+                           n_jobs=-1,
+                           verbose=1)
+
+grid_search.fit(X_train_scaled, y_train)
+
+print("\nЛучшие параметры:", grid_search.best_params_)
+print("Лучшая точность на валидационной выборке: {:.4f}".format(grid_search.best_score_))
+
+# Оценка лучшей модели на тестовых данных
+best_mlp = grid_search.best_estimator_
+y_pred_best = best_mlp.predict(X_test_scaled)
+accuracy_best = accuracy_score(y_test, y_pred_best)
+print(f"Точность лучшей модели на тестовых данных: {accuracy_best:.4f}")
+```
+
+Путем перебора различных комбинаций получаем следующие наилучшие значения:
+<p align="center">
+  <img src="Screen_2.png" />
+</p>
+<p align="center">
   <img src="Screen_3.png" />
 </p>
 
-
-## 5) Построение модели с использованием регуляризации
-Ridge-регрессия (или гребневая регрессия) — это регуляризованная версия линейной регрессии, которая используется для борьбы с мультиколлинеарностью (линейной зависимостью между предикторами) и переобучением. Она добавляет к функции потерь штрафное слагаемое в виде квадрата коэффициентов, чтобы сделать веса модели меньше, но не обнулить их, в отличие от Lasso-регрессии. Алгоритм обучения пытается найти баланс между подгонкой под данные и поддержанием коэффициентов на низком уровне.
-
-```
-# =========
-# 5) Построение модели с использованием регуляризации
-# =========
-
-degree = best_degree  # Используем лучшую степень
-alphas = np.logspace(-4, 3, 10)  # диапазон коэффициентов регуляризации
-
-r2_train_list = []
-r2_test_list = []
-
-for alpha in alphas:
-    pipeline = Pipeline([
-        ("poly", PolynomialFeatures(degree=degree, include_bias=False)),
-        ("scaler", StandardScaler()),
-        ("ridge", Ridge(alpha=alpha, max_iter=10000))
-    ])
-
-    # Обучаем модель на train
-    pipeline.fit(x_train, y_train)
-
-    # Предсказания
-    y_train_pred = pipeline.predict(x_train)
-    y_test_pred = pipeline.predict(x_test)
-
-    # R^2
-    r2_train_list.append(r2_score(y_train, y_train_pred))
-    r2_test_list.append(r2_score(y_test, y_test_pred))
-
-plt.figure(figsize=(8, 5))
-plt.semilogx(alphas, r2_train_list, marker='o', label="Train R^2")
-plt.semilogx(alphas, r2_test_list, marker='o', label="Test R^2")
-plt.xlabel("Alpha (коэффициент регуляризации)")
-plt.ylabel("R^2")
-plt.title(f"Ridge Regression (Polynomial degree={degree})")
-plt.grid(True)
-plt.legend()
-plt.show()
-
-if len(r2_test_list) > 0:
-    best_index = np.argmax(r2_test_list)
-    best_alpha = alphas[best_index]
-    print(f"Наилучший alpha: {best_alpha:.4f}")
-    print(f"Наилучшее R2 на тесте с Ridge: {r2_test_list[best_index]:.4f}")
-else:
-    print("Не удалось вычислить R2 для Ridge регрессии")
-```
-
-Для борьбы с переобучением и коррелированными признаками применим регуляризацию Ridge (L2). Она добавляет штраф к сумме квадратов коэффициентов модели, что стабилизирует обучение и уменьшает влияние сильно коррелированных признаков. В качестве признаков используем полиномиальные признаки 1-ой степени, как в предыдущем пункте (средняя точность и меньше затрат в вычислительной мощности). Обновим наш pipeline, который теперь выполняет следующие шаги:
-
-PolynomialFeatures(degree=degree, include_bias=False) – создаёт новые признаки, учитывающие комбинации и степени всех признаков. StandardScaler() – нормализует признаки. Это важно, так как L2-регуляризация чувствительна к масштабу признаков. Ridge(alpha=alpha, max_iter=10000) – линейная регрессия с L2-регуляризацией. Параметр α контролирует силу штрафа: чем выше α, тем сильнее регуляризация и меньше риск переобучения.
-
-Для подбора оптимального значения α выбираем диапазон от 10⁻⁴ до 10³ в логарифмической шкале.На графике можно увидеть, при каком αlpha модель лучше всего балансирует между переобучением и недообучением. Оптимальное значение α соответствует максимальному R² на тестовой выборке.
-
-
+Так же было проведено сравнение точности трех моделей. По графикам мы видим, что более сложная архитектура дает более хорошие параметры
 <p align="center">
   <img src="Screen_4.png" />
-</p>
-
-<p align="center">
-  <img src="Screen_5.png" />
 </p>
