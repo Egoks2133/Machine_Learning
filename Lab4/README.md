@@ -65,11 +65,6 @@ print(f"Точность MLPClassifier: {accuracy_mlp:.4f}")
 print("\n" + "="*100 + "\n")
 ```
 
-Получаем уследующие значения как для обучающей, так и для тестовой выборки. Модель обучена.
-<p align="center">
-  <img src="Screen_2.png" />
-</p>
-
 
 ## 4) Проверка точности моделей
 Для расчета точности используем метрику accuracy_score из библиотеки scikit-learn.
@@ -81,7 +76,7 @@ print(f"Точность Perceptron: {accuracy_perceptron:.4f}")
 print(f"Точность MLPClassifier: {accuracy_mlp:.4f}")
 ```
 
-По графику можно сказать, что самой подходящей степенью полинома будет 1:
+Получаем следующие результаты:
 <p align="center">
   <img src="Screen_1.png" />
 </p>
