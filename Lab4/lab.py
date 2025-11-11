@@ -16,7 +16,9 @@ phishing_websites = fetch_ucirepo(id=327)
 X = phishing_websites.data.features
 y = phishing_websites.data.targets
 
-# Разделение на тренировочную и тестовую выборки
+# =========
+# 1) Разделение на тестовую и обучающую выборки
+# =========
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
 )
@@ -25,7 +27,9 @@ X_train, X_test, y_train, y_test = train_test_split(
 y_train = np.array(y_train).ravel()
 y_test = np.array(y_test).ravel()
 
-# Масштабирование признаков
+# =========
+# 2) Масштабирование признаков
+# =========
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
@@ -34,7 +38,10 @@ print(f"Размер тренировочной выборки: {X_train_scaled.
 print(f"Размер тестовой выборки: {X_test_scaled.shape}")
 print("\n" + "="*100 + "\n")
 
-# Обучение моделей
+# =========
+# 3) Обучение Perceptron и MLPClassifier
+# =========
+#Perceptron
 print("Обучение Perceptron...")
 perceptron = Perceptron(max_iter=1000, random_state=42)
 perceptron.fit(X_train_scaled, y_train)
@@ -48,11 +55,16 @@ mlp.fit(X_train_scaled, y_train)
 y_pred_mlp = mlp.predict(X_test_scaled)
 accuracy_mlp = accuracy_score(y_test, y_pred_mlp)
 
+# =========
+# 4) Проверка точности моделей
+# =========
 print(f"Точность Perceptron: {accuracy_perceptron:.4f}")
 print(f"Точность MLPClassifier: {accuracy_mlp:.4f}")
 print("\n" + "="*100 + "\n")
 
-# Эксперименты по подбору гиперпараметров для MLPClassifier
+# =========
+# 5) Подбор гиперпараметров
+# =========
 print("Запуск GridSearchCV для подбора гиперпараметров...")
 param_grid = {
     'hidden_layer_sizes': [(50,), (100,), (50, 50), (100, 50)],
