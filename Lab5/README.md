@@ -192,5 +192,5 @@ plt.show()
 </p>
 
 <p align="center">
-  <img src="Screen_4.png" />
+  <img src="Screen_5.png" />
 </p>
