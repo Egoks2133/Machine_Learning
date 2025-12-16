@@ -1,300 +1,206 @@
 # TODO: ПЕРЕДЕЛАЙ РИДМИШКУ 
-# Лабораторная работа 5. Алгоритмы кластеризации данных. Вариант №15
+# Лабораторная работа №6. Сверточные сети
 ## Задание
-Работа ведется в с датасетом "Wholesale customers"
+Работа ведется в с датасетом "Helmet detection", который был взят с сайта kagglehub
 
-1. Произвести масштабирование признаков (scaling).
-2. С использованием библиотеки scikit-learn написать программу с использованием алгоритмов кластеризации данных, позволяющую разделить исходную выборку на классы.
-3. Провести эксперименты и определить наилучший алгоритм кластеризации, параметры алгоритма. Данные экспериментов необходимо представить в отчете (графики, ход проведения эксперимента, выводы).
-
-
-## 1) Масштабирование признаков
-Масштабирование признаков — это процесс приведения всех числовых признаков к одинаковому масштабу. В данном коде используется стандартизация - один из самых популярных методов масштабирования.
+1. С использованием библиотеки Keras загрузить обучающую выборку, создать модель сверточной сети, обучить ее на обучающей выборке, сохранить модель в файл.
+2. Написать дополнительно программу, которая загружает модель из файла, и предоставляет возможность загрузить файл или данные любым иным способом, чтобы проверить точность классификатора.
 
 
-scaler = StandardScaler() — Создание объекта StandardScaler
+## 1) Создание модели
+Свёртная нейронная сеть (CNN,  Convolutional Neural Network) — это специализированный тип нейросетей глубокого обучения, оптимизированный для обработки данных с сеточной структурой, таких как изображения, видео и аудио. Они работают следующим образом: фильтр скользит по входному изображению, вычисляя скалярное произведение между своими весами и соответствующими участками изображения. Каждый фильтр ищет определённую особенность: одни — горизонтальные линии, другие — углы или части объектов. Результат работы фильтра на каждом участке изображения — карта признаков.
 
-X_scaled = scaler.fit_transform(X) — Преобразование тестовых данных
+Архитектура CNN:
 
-pca = PCA(n_components=2) — Создание объекта PCA (Principal Component Analysis)
+Сверточный слой — выделяет локальные особенности входного изображения
 
-X_pca = pca.fit_transform(X_scaled) — Вычисление главных компонент и проецирование исходных многомерных данных на новые 2D-координаты
+Слой подвыборки (пулинг) — уменьшает размерность данных и помогает оставить только самые значимые признаки
+
+Полносвязный слой — строит итоговую модель на основе найденных признаков, отвечает за классификацию или принятие решения
 
 ```
-# =========
-# 1) Масштабирование признаков
-# =========
-
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
-
-pca = PCA(n_components=2)
-X_pca = pca.fit_transform(X_scaled)
-```
+import os
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras import layers
+from PIL import Image
+import xml.etree.ElementTree as ET
+from sklearn.model_selection import train_test_split
+import kagglehub
 
 
-## 2) Опыты с алгоритмами кластеризации
-Кластеризация — метод машинного обучения без учителя, который автоматически группирует похожие объекты данных в кластеры. Цель: найти скрытые паттерны в данных и сгруппировать объекты так, чтобы объекты внутри одного кластера были максимально похожи
+def parse_xml_annotation(xml_path):
+    tree = ET.parse(xml_path)
+    root = tree.getroot()
 
-В качестве методов кластеризации были выбраны: 
+    classes = []
+    for obj in root.findall('object'):
+        class_name = obj.find('name').text.strip().lower()
+        classes.append(class_name)
 
-KMeans — В данном методе задается количество кластеров K, из которых случайно выбираются K центров кластеров. Каждый элемент назначается ближайшему центроиду, после центроиды пересчитываются как среднее точек в кластере. Данный процесс повторяется до стабилизации.
+    has_without_helmet = any('without' in cls for cls in classes)
+    has_with_helmet = any('with' in cls and 'without' not in cls for cls in classes)
 
-Agglomerative Clustering — В данном методе используется иерархический подход. Каждая точка начинается как отдельный кластер и на каждом шаге два самых близких кластера объединяются. Данный процесс продолжается пока не останется K кластеров
-
-Spectral Clustering — В данном методе используется спектральная теория графов. Сначала строится матрица сходства между точками, а затем к ней применяется понижение размерности. В уже уменьшенном пространстве применяется K-Means
-
-В качестве метрик оценки были выбраны:
-
-Silhouette Score — измеряет компактность и разделимость кластеров (от -1 до 1). Чем более компактные кластеры и чем большее расстояние между ними, тем ближе оценка к 1
-
-Calinski-Harabasz Score — измеряет отношение дисперсии(среднего арифметического квадратов отклонений элемента данных от среднего значения всего набора данных) между кластерами к дисперсии внутри кластеров (чем выше, тем лучше)
-
-```
-# =========
-# 2) Опыты с алгоритмами кластеризации
-# =========
-
-# Функция для оценки кластеризации
-def evaluate_clustering(model, data):
-    labels = model.fit_predict(data)
-    if len(set(labels)) > 1:
-        silhouette = silhouette_score(data, labels)
-        calinski_harabasz = calinski_harabasz_score(data, labels)
+    if has_without_helmet:
+        return 1  # Без шлема
+    elif has_with_helmet:
+        return 0  # С шлемом
     else:
-        silhouette = -1
-        calinski_harabasz = -1
-    return labels, silhouette, calinski_harabasz
+        return None
 
-# 2.1 KMeans
-kmeans_params = [2, 3, 4, 5, 6]
-best_score_kmeans = -1
-best_kmeans = None
-best_labels_kmeans = None
-best_k = None
-labels_for_k = []
-scores_kmeans = []
 
-print("=== KMeans Clustering ===")
-for k in kmeans_params:
-    kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
-    labels, silhouette, calinski_harabasz = evaluate_clustering(kmeans, X_scaled)
-    print(f'KMeans с k={k}, Силуэтный коэффициент: {silhouette:.3f}, Calinski-Harabasz: {calinski_harabasz:.1f}')
-    labels_for_k.append(labels)
-    scores_kmeans.append((silhouette, calinski_harabasz))
-    if silhouette > best_score_kmeans:
-        best_score_kmeans = silhouette
-        best_kmeans = kmeans
-        best_labels_kmeans = labels
-        best_k = k
+def load_dataset(dataset_path, img_size=(150, 150), max_samples=2000):
+    images = []
+    labels = []
 
-print(f'Лучшее число кластеров для KMeans: {best_k} с коэффициентом: {best_score_kmeans:.3f}')
+    images_dir = os.path.join(dataset_path, "images")
+    annotations_dir = os.path.join(dataset_path, "annotations")
 
-# Визуализация KMeans для каждого k
-fig, axes = plt.subplots(2, 3, figsize=(15, 10))
-axes = axes.ravel()
-for i, k in enumerate(kmeans_params):
-    labels = labels_for_k[i]
-    silhouette, calinski = scores_kmeans[i]
-    scatter = axes[i].scatter(X_pca[:, 0], X_pca[:, 1], c=labels, cmap='viridis', s=30, alpha=0.7)
-    axes[i].set_title(f'KMeans k={k}\nSilhouette: {silhouette:.3f}\nCalinski-Harabasz: {calinski:.1f}')
-    axes[i].set_xlabel('PC1')
-    axes[i].set_ylabel('PC2')
-    plt.colorbar(scatter, ax=axes[i])
+    image_files = [f for f in os.listdir(images_dir)
+                   if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
 
-# Скрываем последний subplot если нужно
-if len(kmeans_params) < 6:
-    axes[-1].set_visible(False)
+    for i, img_file in enumerate(image_files[:max_samples]):
+        xml_file = os.path.splitext(img_file)[0] + ".xml"
+        xml_path = os.path.join(annotations_dir, xml_file)
 
-plt.tight_layout()
-plt.show()
+        if not os.path.exists(xml_path):
+            continue
 
-# 2.2 Agglomerative Clustering
-agg_params = [2, 3, 4, 5, 6]
-best_score_agg = -1
-best_labels_agg = []
-best_n_agg = None
-labels_list_agg = []
-scores_agg = []
+        label = parse_xml_annotation(xml_path)
+        if label is None:
+            continue
 
-print("\n=== Agglomerative Clustering ===")
-for n in agg_params:
-    agg = AgglomerativeClustering(n_clusters=n)
-    labels, silhouette, calinski_harabasz = evaluate_clustering(agg, X_scaled)
-    print(f'Agglomerative с n_clusters={n}, Силуэтный коэффициент: {silhouette:.3f}, Calinski-Harabasz: {calinski_harabasz:.1f}')
-    labels_list_agg.append(labels)
-    scores_agg.append((silhouette, calinski_harabasz))
-    if silhouette > best_score_agg:
-        best_score_agg = silhouette
-        best_labels_agg = labels
-        best_n_agg = n
+        img_path = os.path.join(images_dir, img_file)
+        try:
+            img = Image.open(img_path).convert('RGB')
+            img = img.resize(img_size)
+            images.append(np.array(img))
+            labels.append(label)
+        except Exception as e:
+            continue
 
-print(f'Лучшее число кластеров для Agglomerative: {best_n_agg} с коэффициентом: {best_score_agg:.3f}')
+    return np.array(images), np.array(labels)
 
-# Визуализация Agglomerative для каждого n
-fig, axes = plt.subplots(2, 3, figsize=(15, 10))
-axes = axes.ravel()
-for i, n in enumerate(agg_params):
-    labels = labels_list_agg[i]
-    silhouette, calinski = scores_agg[i]
-    scatter = axes[i].scatter(X_pca[:, 0], X_pca[:, 1], c=labels, cmap='plasma', s=30, alpha=0.7)
-    axes[i].set_title(f'Agglomerative n={n}\nSilhouette: {silhouette:.3f}\nCalinski-Harabasz: {calinski:.1f}')
-    axes[i].set_xlabel('PC1')
-    axes[i].set_ylabel('PC2')
-    plt.colorbar(scatter, ax=axes[i])
 
-if len(agg_params) < 6:
-    axes[-1].set_visible(False)
+def main():
+    path = kagglehub.dataset_download("andrewmvd/helmet-detection")
 
-plt.tight_layout()
-plt.show()
+    images, labels = load_dataset(path, img_size=(150, 150), max_samples=2000)
 
-# 2.3 Spectral Clustering
-spectral_params = [2, 3, 4, 5, 6]
-best_score_spectral = -1
-best_labels_spectral = []
-best_n_spectral = None
-labels_list_spectral = []
-scores_spectral = []
+    train_images, test_images, train_labels, test_labels = train_test_split(
+        images, labels, test_size=0.2, random_state=42
+    )
 
-print("\n=== Spectral Clustering ===")
-for n in spectral_params:
-    spectral = SpectralClustering(n_clusters=n, affinity='nearest_neighbors', random_state=42)
-    labels, silhouette, calinski_harabasz = evaluate_clustering(spectral, X_scaled)
-    print(f'SpectralClustering с n_clusters={n}, Силуэтный коэффициент: {silhouette:.3f}, Calinski-Harabasz: {calinski_harabasz:.1f}')
-    labels_list_spectral.append(labels)
-    scores_spectral.append((silhouette, calinski_harabasz))
-    if silhouette > best_score_spectral:
-        best_score_spectral = silhouette
-        best_labels_spectral = labels
-        best_n_spectral = n
+    train_images = train_images.astype('float32') / 255.0
+    test_images = test_images.astype('float32') / 255.0
 
-print(f'Лучшее число кластеров для SpectralClustering: {best_n_spectral} с коэффициентом: {best_score_spectral:.3f}')
+    model = tf.keras.Sequential([
+        layers.Conv2D(32, (3, 3), activation='relu', input_shape=(150, 150, 3)),
+        layers.MaxPooling2D((2, 2)),
 
-# Визуализация Spectral для каждого n
-fig, axes = plt.subplots(2, 3, figsize=(15, 10))
-axes = axes.ravel()
-for i, n in enumerate(spectral_params):
-    labels = labels_list_spectral[i]
-    silhouette, calinski = scores_spectral[i]
-    scatter = axes[i].scatter(X_pca[:, 0], X_pca[:, 1], c=labels, cmap='cool', s=30, alpha=0.7)
-    axes[i].set_title(f'Spectral n={n}\nSilhouette: {silhouette:.3f}\nCalinski-Harabasz: {calinski:.1f}')
-    axes[i].set_xlabel('PC1')
-    axes[i].set_ylabel('PC2')
-    plt.colorbar(scatter, ax=axes[i])
+        layers.Conv2D(64, (3, 3), activation='relu'),
+        layers.MaxPooling2D((2, 2)),
 
-if len(spectral_params) < 6:
-    axes[-1].set_visible(False)
+        layers.Conv2D(128, (3, 3), activation='relu'),
+        layers.MaxPooling2D((2, 2)),
 
-plt.tight_layout()
-plt.show()
+        layers.Flatten(),
+        layers.Dense(128, activation='relu'),
+        layers.Dropout(0.5),
 
-# Сравнение лучших результатов каждого метода
-plt.figure(figsize=(15, 5))
+        layers.Dense(1, activation='sigmoid')
+    ])
 
-# Вычисляем Calinski-Harabasz для лучших конфигураций
-best_calinski_kmeans = calinski_harabasz_score(X_scaled, best_labels_kmeans)
-best_calinski_agg = calinski_harabasz_score(X_scaled, best_labels_agg)
-best_calinski_spectral = calinski_harabasz_score(X_scaled, best_labels_spectral)
+    model.compile(
+        optimizer='adam',
+        loss='binary_crossentropy',
+        metrics=['accuracy']
+    )
 
-# Лучший KMeans
-plt.subplot(1, 3, 1)
-plt.scatter(X_pca[:, 0], X_pca[:, 1], c=best_labels_kmeans, cmap='viridis', s=30, alpha=0.7)
-plt.title(f'Лучший KMeans (k={best_k})\nSilhouette: {best_score_kmeans:.3f}\nCalinski-Harabasz: {best_calinski_kmeans:.1f}')
-plt.xlabel('PC1')
-plt.ylabel('PC2')
+    model.fit(
+        train_images, train_labels,
+        epochs=10,
+        batch_size=32,
+        validation_split=0.2,
+        verbose=1
+    )
 
-# Лучший Agglomerative
-plt.subplot(1, 3, 2)
-plt.scatter(X_pca[:, 0], X_pca[:, 1], c=best_labels_agg, cmap='plasma', s=30, alpha=0.7)
-plt.title(f'Лучший Agglomerative (n={best_n_agg})\nSilhouette: {best_score_agg:.3f}\nCalinski-Harabasz: {best_calinski_agg:.1f}')
-plt.xlabel('PC1')
-plt.ylabel('PC2')
+    test_loss, test_acc = model.evaluate(test_images, test_labels, verbose=0)
+    print(f"\nТочность на тестовой выборке: {test_acc:.4f}")
 
-# Лучший Spectral
-plt.subplot(1, 3, 3)
-plt.scatter(X_pca[:, 0], X_pca[:, 1], c=best_labels_spectral, cmap='cool', s=30, alpha=0.7)
-plt.title(f'Лучший Spectral (n={best_n_spectral})\nSilhouette: {best_score_spectral:.3f}\nCalinski-Harabasz: {best_calinski_spectral:.1f}')
-plt.xlabel('PC1')
-plt.ylabel('PC2')
+    model.save('helmet_detection_model.h5')
 
-plt.tight_layout()
-plt.show()
 
-# Определение лучшего метода
-scores = {
-    'KMeans': best_score_kmeans,
-    'Agglomerative': best_score_agg,
-    'SpectralClustering': best_score_spectral
-}
-
-calinski_scores = {
-    'KMeans': best_calinski_kmeans,
-    'Agglomerative': best_calinski_agg,
-    'SpectralClustering': best_calinski_spectral
-}
-
-print("\n=== Сравнение методов ===")
-for method in scores.keys():
-    print(f'{method}: Silhouette: {scores[method]:.3f}, Calinski-Harabasz: {calinski_scores[method]:.1f}')
-
-best_method_silhouette = max(scores, key=scores.get)
-best_method_calinski = max(calinski_scores, key=calinski_scores.get)
-
-print(f'\nЛучший метод по Silhouette: {best_method_silhouette} с коэффициентом {scores[best_method_silhouette]:.3f}')
-print(f'Лучший метод по Calinski-Harabasz: {best_method_calinski} с коэффициентом {calinski_scores[best_method_calinski]:.1f}')
-
-# Дополнительная визуализация: сравнение метрик для всех k
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
-
-# График Silhouette scores
-ax1.plot(kmeans_params, [score[0] for score in scores_kmeans], 'o-', label='KMeans', linewidth=2)
-ax1.plot(agg_params, [score[0] for score in scores_agg], 'o-', label='Agglomerative', linewidth=2)
-ax1.plot(spectral_params, [score[0] for score in scores_spectral], 'o-', label='Spectral', linewidth=2)
-ax1.set_title('Silhouette Score по количеству кластеров')
-ax1.set_xlabel('Количество кластеров')
-ax1.set_ylabel('Silhouette Score')
-ax1.legend()
-ax1.grid(True, alpha=0.3)
-
-# График Calinski-Harabasz scores
-ax2.plot(kmeans_params, [score[1] for score in scores_kmeans], 'o-', label='KMeans', linewidth=2)
-ax2.plot(agg_params, [score[1] for score in scores_agg], 'o-', label='Agglomerative', linewidth=2)
-ax2.plot(spectral_params, [score[1] for score in scores_spectral], 'o-', label='Spectral', linewidth=2)
-ax2.set_title('Calinski-Harabasz Score по количеству кластеров')
-ax2.set_xlabel('Количество кластеров')
-ax2.set_ylabel('Calinski-Harabasz Score')
-ax2.legend()
-ax2.grid(True, alpha=0.3)
-
-plt.tight_layout()
-plt.show()
+if __name__ == '__main__':
+    main()
 ```
 
-Для KMeans получаем следующие результаты:
+
+## 2) Проверка модели
+Для проверки точности обученной модели в неё можно загрузить собственную картинку, чтобы модель выдала свое предсказание. Для этого входная картинка преобразуется в RGB формат и изменяется до размера 150x150 пикселей. После этого вызывается сохраненная модель, в которую передается изображение. В качестве метрики оценки используется число с плавающей точкой от 0 до 1 где:
+
+0 — класс "С шлемом"
+
+1 — класс "Без шлема"
+
+```
+import numpy as np
+from PIL import Image
+from tensorflow.keras.models import load_model
+
+
+def preprocess_image(image_path, img_size=(150, 150)):
+    img = Image.open(image_path).convert('RGB')
+    img = img.resize(img_size)
+    img_array = np.array(img).astype('float32') / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
+    return img_array
+
+
+def main():
+    model = load_model('helmet_detection_model.h5')
+
+    image_path = input("Введите путь к изображению: ")
+
+    img_array = preprocess_image(image_path, img_size=(150, 150))
+
+    prediction = model.predict(img_array, verbose=0)
+
+    probability_no_helmet = prediction[0][0]
+    probability_with_helmet = 1 - probability_no_helmet
+
+    if probability_no_helmet > 0.5:
+        predicted_class = "Без шлема"
+        confidence = probability_no_helmet
+    else:
+        predicted_class = "С шлемом"
+        confidence = probability_with_helmet
+
+    print(f"Результат классификации: {predicted_class}")
+    print(f"Уверенность: {confidence:.2%}")
+    print(f"Вероятность 'С шлемом': {probability_with_helmet:.4f} ({probability_with_helmet:.2%})")
+    print(f"Вероятность 'Без шлема': {probability_no_helmet:.4f} ({probability_no_helmet:.2%})")
+
+
+if __name__ == '__main__':
+    main()
+```
+
+Проверим точность модели на произвольных фотографиях:
 <p align="center">
   <img src="Screen_1.png" />
 </p>
 
-Для Agglomerative Clustering получаем следующие результаты:
 <p align="center">
   <img src="Screen_2.png" />
 </p>
 
-Для Spectral Clustering получаем следующие результаты:
+=============================================================================================================================================================================
+
 <p align="center">
   <img src="Screen_3.png" />
 </p>
 
-Сравнив результаты, мы можем сделать следующие выводы:
 <p align="center">
   <img src="Screen_4.png" />
-</p>
-
-<p align="center">
-  <img src="Screen_5.png" />
-</p>
-
-<p align="center">
-  <img src="Screen_6.png" />
 </p>
