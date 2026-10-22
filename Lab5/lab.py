@@ -33,7 +33,7 @@ X_pca = pca.fit_transform(X_scaled)
 def evaluate_clustering(model, data):
     labels = model.fit_predict(data)
     if len(set(labels)) > 1:
-        silhouette = silhouette_score(data, labels)
+        silhouette = silhouette_score(data, labels, random_state=42)
         calinski_harabasz = calinski_harabasz_score(data, labels)
     else:
         silhouette = -1
