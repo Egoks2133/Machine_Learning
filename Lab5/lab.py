@@ -22,7 +22,7 @@ y = wholesale_customers.data.targets
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
-pca = PCA(n_components=2)
+pca = PCA(n_components=2, random_state=42)
 X_pca = pca.fit_transform(X_scaled)
 
 # =========
