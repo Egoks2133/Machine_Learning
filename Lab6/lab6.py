@@ -9,6 +9,7 @@ import kagglehub
 
 
 def parse_xml_annotation(xml_path):
+    def parse_xml_annotation(xml_path):
     tree = ET.parse(xml_path)
     root = tree.getroot()
 
