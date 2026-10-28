@@ -104,20 +104,6 @@ def main():
         verbose=1
     )
 
-        model.compile(
-        optimizer='adam',
-        loss='binary_crossentropy',
-        metrics=['accuracy']
-    )
-
-    model.fit(
-        train_images, train_labels,
-        epochs=10,
-        batch_size=32,
-        validation_split=0.2,
-        verbose=1
-    )
-
     test_loss, test_acc = model.evaluate(test_images, test_labels, verbose=0)
     print(f"\nТочность на тестовой выборке: {test_acc:.4f}")
 
